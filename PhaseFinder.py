@@ -342,7 +342,8 @@ def ratio(inv, fastq1, fastq2, threads, output):
 
     cmd = """
     cat {output}.bed|awk 'BEGIN{{OFS="\\t"}}{{print $4,$5,$1}}'|sed 's/_\(.\)$/\\t\\1/g'|awk '{{if($2 % 128 >= 64){{P=1}}else{{P=2}};print $1"\\t"P"\\t"$3"\\t"$4}}' > {output}.tab
-    cut -f 1-3 {output}.tab|sort|uniq -u|fgrep -f - {output}.tab|cut -f 3-4|sort|uniq -c|awk '{{print $2"\\t"$3"\\t"$1}}' >{output}.pe.count """.format(
+    awk 'NR==FNR {{keep[$0]; next}} ($1"\\t"$2"\\t"$3) in keep' <(cut -f 1-3 {output}.tab | sort | uniq -u) {output}.tab | 
+    cut -f 3-4 | sort | uniq -c | awk '{{print $2"\t"$3"\t"$1}}' > {output}.pe.count """.format(
         output=output
     )
     print("****** NOW RUNNING COMMAND ******: " + cmd)
