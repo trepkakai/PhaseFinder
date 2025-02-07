@@ -9,6 +9,7 @@ from collections import defaultdict
 import pandas as pd
 from Bio import SeqIO
 from Bio.SeqUtils import gc_fraction
+import shutil
 
 
 def run_cmd(cmd):
@@ -23,6 +24,8 @@ def run_cmd(cmd):
     output = p.communicate()[0]
     return output
 
+def is_executable(name):
+    return shutil.which(name) is not None
 
 def is_tool(name):
     """Check whether `name` is on PATH."""
@@ -329,7 +332,7 @@ def ratio(inv, fastq1, fastq2, threads, output):
     run_cmd(cmd)
 
     cmd = """
-    awk -v out={out} 'BEGIN{{OFS="\\t"}}{{print $1"_F",$2,$3,$4,$5"\\n"$1"_R",$2,$3,$4,$5 > out".bed";print $1"_F", $6 "\\n" $1"_R",$6 > out".info" }}'  {out}
+    awk -v out="{out}" 'BEGIN{{OFS="\t"}} {{print $1"_F",$2,$3,$4,$5"\\n"$1"_R",$2,$3,$4,$5 > sprintf("%s.bed", out); print $1"_F", $6 "\\n" $1"_R",$6 > sprintf("%s.info", out)}}' {out}
     awk '{{print $1"\\t"$2"\\t"$3"\\t1\\n"$1"\\t"$4"\\t"$5"\\t1\\n"$1"\\t"$2"\\t"$5"\\t-1"}}' {out}.bed |slopBed -b {oversize} -g {out}.info |\
     sortBed|intersectBed -c -f 1 -a - -b {output}.bed |awk '{{a[$1]+=$4*$5}}END{{for(i in a){{print i"\\t"a[i]}}}}'|sort -k1,1|sed 's/_F\\t/\\tF\\t/;s/_R\\t/\\tR\\t/' >{output}.span.count""".format(
         out=inv + ".info.tab", output=output, oversize=oversize
@@ -338,7 +341,7 @@ def ratio(inv, fastq1, fastq2, threads, output):
     run_cmd(cmd)
 
     cmd = """
-    cat {output}.bed|awk 'BEGIN{{OFS="\\t"}}{{print $4,$5,$1}}'|sed 's/_\(.\)$/\\t\\1/g'|awk '{{if(and(64,$2)){{P=1}}else{{P=2}};print $1"\\t"P"\\t"$3"\\t"$4}}' > {output}.tab
+    cat {output}.bed|awk 'BEGIN{{OFS="\\t"}}{{print $4,$5,$1}}'|sed 's/_\(.\)$/\\t\\1/g'|awk '{{if($2 % 128 >= 64){{P=1}}else{{P=2}};print $1"\\t"P"\\t"$3"\\t"$4}}' > {output}.tab
     cut -f 1-3 {output}.tab|sort|uniq -u|fgrep -f - {output}.tab|cut -f 3-4|sort|uniq -c|awk '{{print $2"\\t"$3"\\t"$1}}' >{output}.pe.count """.format(
         output=output
     )
